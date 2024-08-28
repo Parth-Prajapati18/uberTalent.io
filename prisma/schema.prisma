@@ -1,0 +1,445 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+}
+
+// datasource db {
+//   provider = "postgresql"
+//   url = env("POSTGRES_PRISMA_URL") // uses connection pooling
+//   directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
+// }
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  firstName  String?  @map("first_name")
+  lastName   String?  @map("last_name")
+  profileImg String?  @map("profile_img")
+  status     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  freelancerProfile   FreelancerProfile?
+  client              Client?                 @relation(fields: [clientId], references: [id])
+  clientId            String?                 @map("client_id")
+  jobCreatedBy        Job[]                   @relation("JobCreatedBy")
+  jobUpdatedBy        Job[]                   @relation("JobUpdatedBy")
+  savedJobs           SavedJobs[]
+  proposal            Proposal[]
+  contract            Contract[]
+  timesheet           Timesheet[]
+  paymentLog          PaymentLog[]
+  invitesCreated      JobInvite[]             @relation("InviteCreatedBy")
+  jobInvites          JobInvite[]             @relation("UserInvited")
+  image               String?
+  emailVerified       String?                 @map("email_verified")
+  clerkId             String?                 @unique @map("clerk_id")
+
+  @@map("user")
+}
+
+// model VerificationToken {
+//   identifier String
+//   token      String   @unique
+//   expires    DateTime
+
+//   @@unique([identifier, token])
+//   @@map("verificationtoken")
+// }
+
+model Language {
+  id             String               @id @default(uuid())
+  language       String               @map("language")
+  proficiency    LanguageProficiency  @map("proficiency")
+  freelancerId   String               @map("freelancer_id")
+  freelancer     FreelancerProfile    @relation(fields: [freelancerId], references: [id])
+
+  @@map("language")
+}
+
+model FreelancerProfile {
+  id                      String                @id @default(uuid())
+  user                    User                  @relation(fields: [userId], references: [id])
+  userId                  String                @unique @map("user_id")
+  rate                    Int
+  skills                  String[]
+  title                   String
+  overview                String?
+  status                  FreelancerStatus?
+  country                 String?
+  languages               Language[]
+  timezone                String?
+  category                String[]
+  availability            Availability?
+  stripe_acct_id          String?               @map("stripe_acct_id")
+  createdAt               DateTime              @default(now()) @map("created_at")
+  updatedAt               DateTime              @updatedAt @map("updated_at")
+  isPrivate               Boolean               @default(false) @map("is_private")
+  portfolio               Portfolio[]
+
+  @@map("freelancer")
+}
+
+model Client {
+  id                    String      @id @default(uuid())
+  user                  User[]
+  status                ClientStatus @default(ACTIVE)
+  companyName           String      @map("company_name")
+  industry              String
+  companyLogo           String?     @map("company_logo")
+  country               String?
+  contract              Contract[]
+  createdAt             DateTime    @default(now()) @map("created_at")
+  updatedAt             DateTime    @updatedAt @map("updated_at")
+  jobs                  Job[]
+  invites               JobInvite[]
+  stripe_customer_id    String?     @map("stripe_customer_id")
+  paymentMethodStatus   PaymentMethodStatus?    @default(NONE) @map("payment_method_status") 
+
+  @@map("client")
+}
+
+model Job {
+  id            String          @id @default(uuid())
+  client        Client          @relation(fields: [clientId], references: [id])
+  clientId      String          @map("client_id")
+  title         String
+  description   String
+  categories    String[]
+  skills        String[]
+  duration      ProjectDuration
+  compType      JobCompType     @map("comp_type")
+  isPublished   Boolean         @default(false) @map("is_published")
+  status        JobStatus
+  hourlyMinRate Int?            @map("hourly_min_rate")
+  hourlyMaxRate Int?            @map("hourly_max_rate")
+  projectCost   Int?            @map("project_cost")
+  createdBy     User?           @relation("JobCreatedBy", fields: [createdById], references: [id])
+  createdById   String?         @map("created_by")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedBy     User?           @relation("JobUpdatedBy", fields: [updatedById], references: [id])
+  updatedById   String?         @map("updated_by")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  isDeleted     Boolean         @default(false) @map("is_deleted")
+  savedJobs     SavedJobs[]
+  contract      Contract[]
+  proposal      Proposal[]
+  invites       JobInvite[]
+
+  @@map("job")
+}
+
+model JobInvite {
+  id          String   @id @default(uuid())
+  client      Client   @relation(fields: [clientId], references: [id])
+  clientId    String   @map("client_id")
+  user        User     @relation("UserInvited", fields: [userId], references: [id])
+  userId      String   @map("user_id")
+  job         Job      @relation(fields: [jobId], references: [id])
+  jobId       String   @map("job_id")
+  message     String   @map("invite_message")
+  createdBy   User     @relation("InviteCreatedBy", fields: [createdById], references: [id])
+  createdById String   @map("createdby_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, jobId, clientId])
+  @@map("job_invite")
+}
+
+model SavedJobs {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @map("user_id")
+  job       Job      @relation(fields: [jobId], references: [id])
+  jobId     String   @map("job_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, jobId])
+  @@map("saved_jobs")
+}
+
+// model RecentlyViewedJobs {
+//   id        String   @id @default(uuid())
+//   user      User     @relation(fields: [userId], references: [id])
+//   userId    String   @map("user_id")
+//   job       Job      @relation(fields: [jobId], references: [id])
+//   jobId     String   @map("job_id")
+//   createdAt DateTime @default(now()) @map("created_at")
+
+//   @@map("job_viewed")
+// }
+
+model Proposal {
+  id          String         @id @default(uuid())
+  user        User           @relation(fields: [userId], references: [id])
+  userId      String         @map("user_id")
+  job         Job            @relation(fields: [jobId], references: [id])
+  jobId       String         @map("job_id")
+  rate        Int
+  coverLeter  String         @map("cover_leter")
+  attachments String?
+  status      ProposalStatus
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  contract    Contract?      @relation(fields: [contractId], references: [id])
+  contractId  String?        @unique
+
+  @@unique([userId, jobId])
+  @@map("proposal")
+}
+
+model Contract {
+  id                 String              @id @default(uuid())
+  job                Job                 @relation(fields: [jobId], references: [id])
+  jobId              String              @map("job_id")
+  freelancer         User                @relation(fields: [freelancerId], references: [id])
+  freelancerId       String              @map("freelancer_id")
+  client             Client              @relation(fields: [clientId], references: [id])
+  clientId           String              @map("client_id")
+  type               JobCompType
+  rate               Int
+  status             ContractStatus
+  weeklyLimit        Int                 @map("weekly_limit")
+  startDate          DateTime?           @map("start_date")
+  endDate            DateTime?           @map("end_date")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime?           @updatedAt @map("updated_at")
+  title              String?
+  description        String?
+  attachments        String?
+  proposal           Proposal?
+  timesheets         Timesheet[]
+  paymentService     Boolean             @default(true) @map("payment_service")
+  rejectedReasonCode RejectedReasonCode? @map("rejected_reason_code")
+
+  @@map("contract")
+}
+
+model Timesheet {
+  id                     String                @id @default(uuid())
+  weekStart              DateTime              @map("week_start")
+  weekNumber             Int                   @map("week_number")
+  mondayHours            Decimal               @map("monday_hours") @db.Decimal(5, 2) @default(0)
+  tuesdayHours           Decimal               @map("tuesday_hours") @db.Decimal(5, 2) @default(0)
+  wednesdayHours         Decimal               @map("wednesday_hours") @db.Decimal(5, 2) @default(0)
+  thursdayHours          Decimal               @map("thursday_hours") @db.Decimal(5, 2) @default(0)
+  fridayHours            Decimal               @map("friday_hours") @db.Decimal(5, 2) @default(0)
+  saturdayHours          Decimal               @map("saturday_hours") @db.Decimal(5, 2) @default(0)
+  sundayHours            Decimal               @map("sunday_hours") @db.Decimal(5, 2) @default(0)
+  totalWeekHours         Decimal               @map("total_week_hours") @db.Decimal(5, 2) @default(0)
+  status                 TimesheetStatus       @default(PENDING)
+  issueStatus            TimesheetIssueStatus? @map("issue_status")
+  issueDetail            String?               @map("issue_detail")
+  resolutionDetail       String?               @map("resolution_detail")
+  user                   User                  @relation(fields: [userId], references: [id])
+  userId                 String                @map("user_id")
+  payment_intent_id      String?
+  payment_intent_created DateTime?
+  invoice                Invoice[]
+  contract               Contract              @relation(fields: [contractId], references: [id])
+  contractId             String                @map("contract_id")
+  isPaid                 Boolean               @default(false) @map("is_paid")
+  PaymentLog             PaymentLog[]
+  rate                   Int                   @default(0)
+
+  @@unique([weekStart, contractId], name: "UniqueWeekStartPerContract")
+  @@map("timesheet")
+}
+
+model PaymentLog {
+  id          String    @id @default(uuid())
+  timesheet   Timesheet @relation(fields: [timesheetId], references: [id], onDelete: Cascade)
+  logText     String    @map("log_text")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  createdBy   User?      @relation(fields: [createdById], references: [id])
+  createdById String?    @map("created_by")
+  timesheetId String    @map("timesheet_id") 
+
+  @@map("payment_log")
+}
+
+model Invoice {
+  id                  String              @id @default(uuid())
+  createdAt           DateTime            @default(now()) @map("created_at")
+  amount              Decimal             @db.Decimal(10, 2)
+  status              InvoiceStatus
+  issueStatus         InvoiceIssueStatus?
+  issueDetail         String?             @map("issue_detail")
+  resolutionDetail    String?             @map("resolution_detail")
+  timesheet           Timesheet           @relation(fields: [timesheetId], references: [id])
+  timesheetId         String
+  stripePaymentIntent String?             @map("stripe_payment_intent")
+
+  @@map("invoice")
+}
+
+model Portfolio {
+  id                  String                          @id @default(uuid())
+  title               String
+  description         String
+  url                 String?
+  skills              String[]
+  createdAt           DateTime                        @default(now()) @map("created_at")
+  freelancerId        String                          @map("freelancer_id")
+  freelancerProfile   FreelancerProfile               @relation(fields: [freelancerId], references: [id])
+  content             PortfolioContent[]  
+
+  @@map("portfolio")
+} 
+
+model PortfolioContent {
+  id            String                      @id @default(uuid())
+  type          PortfolioContentType        // Can be 'IMAGE', 'PDF'
+  content       String                      // Stores the actual URL or path
+  portfolioId   String                      @map("portfolio_id") // Foreign key to Portfolio
+  portfolio     Portfolio                   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@map("portfolio_content")
+}
+
+enum PortfolioContentType {
+  IMAGE
+  PDF
+
+  @@map("portfolio_content_type")
+}
+
+enum PaymentMethodStatus {
+  NONE
+  VALID
+  INVALID
+
+  @@map("payment_method_status")
+}
+
+enum TimesheetStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+
+  @@map("timesheet_status")
+}
+
+enum TimesheetIssueStatus {
+  NO_ISSUE
+  UNDER_REVIEW
+  RESOLVED
+  UNRESOLVED
+
+  @@map("timesheet_issue_status")
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PAID
+  CANCELLED
+
+  @@map("invoice_status")
+}
+
+enum InvoiceIssueStatus {
+  NO_ISSUE
+  UNDER_REVIEW
+  RESOLVED
+  UNRESOLVED
+
+  @@map("invoice_issue_status")
+}
+
+enum JobCompType {
+  HOURLY
+  FIXED
+
+  @@map("job_comp_type")
+}
+
+enum JobStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+
+  @@map("job_status")
+}
+
+enum ContractStatus {
+  PENDING
+  REJECTED
+  WITHDRAWN
+  ACTIVE
+  COMPLETED
+
+  @@map("contract_status")
+}
+
+enum ProposalStatus {
+  DISQUALIFIED
+  OFFER
+  SUBMITTED
+  SHORT_LISTED
+  WITHDRAWN
+
+  @@map("proposal_status")
+}
+
+enum FreelancerStatus {
+  ACTIVE
+  ON_HOLD
+  SUSPENDED
+
+  @@map("freelancer_status")
+}
+
+enum ClientStatus {
+  ACTIVE
+  ON_HOLD
+  SUSPENDED
+ 
+  @@map("client_status")
+}
+
+enum Availability {
+  MORE_THAN_30
+  LESS_THAN_30
+  OPEN_OFFERS
+  NONE
+
+  @@map("availability")
+}
+
+enum ProjectDuration {
+  ONE_TO_THREE_MONTHS
+  THREE_TO_SIX_MONTHS
+  MORE_THAN_6_MONTHS
+
+  @@map("project_duration")
+}
+
+enum RejectedReasonCode {
+  RATE_TOO_LOW
+  JOB_REQUIREMENTS_NOT_CLEAR
+  PROJECT_TIMELINE_UNREASONABLE
+  NOT_ENOUGH_INFORMATION_PROVIDED
+  ALREADY_COMMITTED_TO_OTHER_PROJECTS
+  NOT_A_GOOD_FIT_FOR_SKILLS
+  CONCERNS_ABOUT_PAYMENT_SECURITY
+  OTHER
+
+  @@map("rejected_reason_code")
+}
+
+enum LanguageProficiency {
+  BASIC
+  CONVERSATIONAL
+  FLUENT
+  NATIVE_BILINGUAL
+
+  @@map("language_proficiency")
+}
